@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import os
 
-from HTMLBuilder import HTMLBuilder
-from StatsCalculator import StatsCalculator
+from utils.html_builder import HTMLBuilder
+from .stats_calculator import StatsCalculator
 
 calc = StatsCalculator()
 

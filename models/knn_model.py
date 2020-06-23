@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
-from Kernels import kernels
+from utils.kernels import kernels
 from scipy.spatial.distance import cdist
 from sklearn.utils import shuffle
 
-from MetaFeatureExtractor import MetaFeatureExtractor
+from datasets.meta_feature_extractor import MetaFeatureExtractor
 
 class KNNConfig():
 

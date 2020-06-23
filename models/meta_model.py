@@ -1,8 +1,8 @@
 import numpy as np
 
-from KNNModel import KNNModel, KNNConfig
-from Kernels import kernels
-from HTMLBuilder import HTMLBuilder
+from .knn_model import KNNModel, KNNConfig
+from utils.kernels import kernels
+from utils.html_builder import HTMLBuilder
 from sklearn.model_selection import StratifiedKFold
 
 class MetaModel():
@@ -43,12 +43,14 @@ class MetaModel():
             Array of prediction modes to use in format (top, radius).
         splits : int, optional
             Amount of splits to use in StratifiedKFold.
+        random_states : array, optional
+            Random states to use in StratifiedKFold.
 
         Returns
         -------
         None
     """
-    def perform_kfold(self, html_path, kfold_table_name, model, datasets, ds_names, stats, modes, splits=5):
+    def perform_kfold(self, html_path, kfold_table_name, model, datasets, ds_names, stats, modes, splits=5, random_states = [42]):
         kf = StratifiedKFold(n_splits=splits, shuffle=True, random_state=42)
 
         baselines = stats[:, 0]
@@ -58,27 +60,29 @@ class MetaModel():
         builder = HTMLBuilder(html_path, kfold_table_name, kfold=True)
         rankings = np.array(list(map(lambda metric: np.argsort(metric)[::-1], metrics)))
         total_losses = []
-        for train_index, test_index in kf.split(datasets, np.ones(datasets.shape[0])):
-            datasets_train, datasets_test = datasets[train_index], datasets[test_index]
-            rankings_train, rankings_test = rankings[train_index], rankings[test_index]
-            metrics_test, baselines_test = metrics[test_index], baselines[test_index]
-            ds_names_test, max_features_test = ds_names[test_index], max_features[test_index]
-            model.fit(datasets_train, rankings_train)
-            predictions = model.predict(datasets_test, max_features_test, extended=True)
+        for state in random_states:
+            kf = StratifiedKFold(n_splits=splits, shuffle=True, random_state=state)
+            for train_index, test_index in kf.split(datasets, np.ones(datasets.shape[0])):
+                datasets_train, datasets_test = datasets[train_index], datasets[test_index]
+                rankings_train, rankings_test = rankings[train_index], rankings[test_index]
+                metrics_test, baselines_test = metrics[test_index], baselines[test_index]
+                ds_names_test, max_features_test = ds_names[test_index], max_features[test_index]
+                model.fit(datasets_train, rankings_train)
+                predictions = model.predict(datasets_test, max_features_test, extended=True)
 
-            losses = []
-            predictions_modes = []
-            for top, radius in modes:
-                pred_mode = model.prediction_mode(predictions, top, radius)
-                loss = model.loss(metrics_test, pred_mode).reshape(-1, 1)
-                losses.append(loss)
-                predictions_modes.append(pred_mode)
+                losses = []
+                predictions_modes = []
+                for top, radius in modes:
+                    pred_mode = model.prediction_mode(predictions, top, radius)
+                    loss = model.loss(metrics_test, pred_mode).reshape(-1, 1)
+                    losses.append(loss)
+                    predictions_modes.append(pred_mode)
 
-            losses = np.concatenate(losses, axis=1)
-            total_losses.append(losses)
-            predictions_modes = np.array(list(zip(*predictions_modes)))
-            builder.write_kfold(ds_names_test, metrics_test, baselines_test, predictions_modes, losses)
-        builder.write_loss(np.concatenate(total_losses).T, print_categories=True)
+                losses = np.concatenate(losses, axis=1)
+                total_losses.append(losses)
+                predictions_modes = np.array(list(zip(*predictions_modes)))
+                builder.write_kfold(ds_names_test, metrics_test, baselines_test, predictions_modes, losses)
+        builder.write_loss(np.concatenate(total_losses).T, print_categories=True, n_folds = len(random_states))
 
     """
         Performs a k-fold cross-validation with a specified model and returns the losses for each dataset.

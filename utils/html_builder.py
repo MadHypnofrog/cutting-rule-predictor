@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
-from StatsCalculator import StatsCalculator
+from datasets.stats_calculator import StatsCalculator
 
 #TODO: customize headers to use with multiple metrics
 header = ''.join(['<html><head><link rel=\"stylesheet\" href=\"styles.css\"></head>',
@@ -70,8 +71,8 @@ class HTMLBuilder():
     """
     def build_graph(self, ds_name, metrics, baseline, metric_name, dot=None):
         plt.clf()
-        plt.xlabel('Number of features')
-        plt.ylabel('Metric')
+        plt.xlabel('Число признаков')
+        plt.ylabel('Метрика')
         numbers = [i + 1 for i in range(len(metrics))]
         plt.plot(numbers, metrics)
         plt.hlines([baseline], 1, len(metrics))
@@ -95,11 +96,12 @@ class HTMLBuilder():
     """
     def build_hist(self, losses):
         plt.clf()
+        matplotlib.rcParams.update({'font.size': 18})
         num_losses = len(losses)
         fig, axs = plt.subplots(num_losses, 1, figsize=[12.8, 9.6], tight_layout=True)
         for i in range(num_losses):
-            axs[i].set_xlabel('Loss function value')
-            axs[i].set_ylabel('Percentage')
+            axs[i].set_xlabel('Значение функции потерь')
+            axs[i].set_ylabel('Процент')
             axs[i].hist(losses[i], bins=100, weights=np.ones(len(losses[i])) / len(losses[i]))
             axs[i].get_yaxis().set_major_formatter(PercentFormatter(1))
         fig.tight_layout(pad=8.0)
@@ -253,21 +255,25 @@ class HTMLBuilder():
             Loss values for all of the datasets. Each row is a single loss of each of the datasets.
         print_categories : bool, optional
             If True, prints the amount of datasets in each of the categories described in the end of the paper.
+        n_fold : int, optional
+        	Number of k-folds used.
 
         Returns
         -------
         None
     """
-    def write_loss(self, losses, print_categories=False):
+    def write_loss(self, losses, print_categories=False, n_folds=None):
         self.build_hist(losses)
-        losses_rounded = [td % str(round(np.mean(loss), 4)) for loss in losses]
+        buckets = np.split(losses, n_folds, axis=1)
+        means = np.apply_along_axis(lambda z: np.mean(z), 2, buckets).T
+        losses_rounded = [td % '/'.join([str(round(np.mean(m), 4)), str(round(np.var(m), 4))]) for m in means]
         if print_categories:
-            print(len([l for l in losses[0] if l == 0.0]))
-            print(len([l for l in losses[1] if l == 0.0]))
-            print(len([l for l in losses[2] if l == 0.0]))
-            print(len([l for l in losses[2] if l < 0.2]))
-            print(len([l for l in losses[2] if l < 0.5]))
-            print(len([l for l in losses[2] if l < 1]))
+            print(len([l for l in losses[0] if l == 0.0]) / n_folds)
+            print(len([l for l in losses[1] if l == 0.0]) / n_folds)
+            print(len([l for l in losses[2] if l == 0.0]) / n_folds)
+            print(len([l for l in losses[2] if l < 0.2]) / n_folds)
+            print(len([l for l in losses[2] if l < 0.5]) / n_folds)
+            print(len([l for l in losses[2] if l < 1]) / n_folds)
 
         hist = tr % ''.join([td % (img % 'kfold\\hist.png'), td % '', td % '', td % '', td % '', td % ''])
         loss = tr % ''.join([td % '', td % '', td % ''] + losses_rounded)
